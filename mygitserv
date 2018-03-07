@@ -1,0 +1,87 @@
+#!/bin/sh
+
+KEYSDIR=
+KEYSEXTERNAL='cat /unsecure/
+KEYSRESULT='/tmp/tmp.auth_keys.'$$
+
+
+#(
+#	cat ~/.ssh/authorized_keys.local
+#	echo '##--mygitserv--##'
+#	cat -- "$KEYSDIR/"*.pub
+#)
+
+msg() {
+	printf '%s: %s\n' "$1" "$2"
+}
+echo_() { printf '%s\n' "$1"; }
+
+G() {
+	local self="G"
+	local me="group"
+	local dir="groups"
+	local cmd="$1";shift;
+	case "$cmd" in
+		(checkinit)
+			if [ ! -d "$dir" ]; then
+				msg error "$me: not initialized"
+				return 1
+			fi
+		;;
+		(init)
+			if [ -d "$dir"; then
+				msg info "$me already initialized"
+				return 2
+			fi
+			mkdir -- "$dir"
+		;;
+		(exists)
+			$self checkinit
+			local name="$1";shift;
+			[ -d "$dir/$name" ]
+			return $?
+		;;
+		(add)
+			$self checkinit
+			local name="$1";shift;
+			if $self exists "$name"; then
+				msg info "$me: $name already exists"
+				return 2
+			fi
+
+			echo "ln -s ../../users/$name $dir/$name/$2"
+		;;
+		(del)
+			$self checkinit
+			local name="$1";shift;
+			if ! $self exists "$name"; then
+				msg info "$me: $name does not exist"
+				return 2
+			fi
+			if [ ! -h "$dir/$name" ]; then
+				msg error "$me: $name is not a symlink (unsupported entry type)"
+				return 1
+			fi
+			rm -- "$dir/name"
+		;;
+		(list)
+			$self checkinit
+			for x in "$dir"/*; do
+				[ -h "$x" ] || continue
+				echo_ "$x"
+			done
+		;;
+		(help)
+			echo 'Usage: '"$self"' <init|list>|<add|del|exists> <groupname> [...]'
+		;;
+		(*)
+			msg error "Unknow command"
+			return 1
+		;;
+	esac
+}
+
+# repo/$PROJECT.git
+# users/$USER/1.pub
+# groups/$GROUPNAME/$USER -> ../../users/$USER
+#
